@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' app:; img-src 'self' app: data: blob:; media-src 'self' app: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>MeanderCut</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand"><span class="logo"></span>MeanderCut</div>
+    <div class="top-actions">
+      <button class="btn ghost" data-cmd="new" title="New project (Ctrl+N)">New</button>
+      <button class="btn ghost" data-cmd="open" title="Open project (Ctrl+O)">Open</button>
+      <button class="btn ghost" data-cmd="save" title="Save project (Ctrl+S)">Save</button>
+    </div>
+    <div class="project-name" id="projectName">Untitled</div>
+    <div class="top-actions right">
+      <button class="btn ghost" data-cmd="undo" title="Undo (Ctrl+Z)">↶</button>
+      <button class="btn ghost" data-cmd="redo" title="Redo (Ctrl+Y)">↷</button>
+      <button class="btn primary" data-cmd="export" title="Export (Ctrl+E)">Export</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- Media bin -->
+    <section class="panel media-panel">
+      <div class="panel-head">
+        <span>Media</span>
+        <div class="row gap4">
+          <button class="btn small" data-cmd="record" title="Record voice-over (Ctrl+R)">● Record</button>
+          <button class="btn small accent" data-cmd="import" title="Import video, audio or images (Ctrl+I)">+ Import</button>
+        </div>
+      </div>
+      <div class="media-tabs" id="mediaTabs">
+        <button class="tab active" data-filter="all">All</button>
+        <button class="tab" data-filter="video">Video</button>
+        <button class="tab" data-filter="audio">Audio</button>
+        <button class="tab" data-filter="image">Images</button>
+      </div>
+      <div class="media-list" id="mediaList">
+        <div class="empty-hint" id="mediaEmpty">
+          <div class="big">Drop files here</div>
+          <div>Video, audio, voice recordings and images.<br>Or click <b>+ Import</b>.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Preview -->
+    <section class="panel preview-panel">
+      <div class="preview-stage" id="previewStage">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="previewCanvas"></canvas>
+          <div class="guides" id="guides"></div>
+          <div class="transform-box hidden" id="transformBox"><div class="handle"></div></div>
+        </div>
+      </div>
+      <div class="transport">
+        <div class="tc" id="timecode">00:00:00:00</div>
+        <div class="row gap4 center-controls">
+          <button class="icon-btn" data-cmd="toStart" title="Go to start (Home)">⏮</button>
+          <button class="icon-btn" data-cmd="prevFrame" title="Previous frame (←)">◀︎</button>
+          <button class="icon-btn play" data-cmd="play" id="playBtn" title="Play / Pause (Space)">▶</button>
+          <button class="icon-btn" data-cmd="nextFrame" title="Next frame (→)">▶︎</button>
+          <button class="icon-btn" data-cmd="toEnd" title="Go to end (End)">⏭</button>
+        </div>
+        <div class="row gap4 view-controls">
+          <select id="aspectSelect" title="Canvas aspect ratio">
+            <option value="16:9">16:9</option><option value="9:16">9:16</option><option value="1:1">1:1</option>
+            <option value="4:5">4:5</option><option value="4:3">4:3</option><option value="21:9">21:9</option>
+          </select>
+          <select id="zoomSelect" title="Preview zoom">
+            <option value="fit">Fit</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="1">100%</option>
+          </select>
+          <select id="qualitySelect" title="Preview quality (export is always full quality)">
+            <option value="1">Full</option><option value="0.5">Half</option><option value="0.25">Quarter</option>
+          </select>
+          <button class="icon-btn" id="guidesBtn" title="Safe-area guides and grid">▦</button>
+          <div class="meter" title="Output level"><div id="meterL"></div><div id="meterR"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Inspector -->
+    <section class="panel inspector-panel">
+      <div class="panel-head"><span id="inspectorTitle">Project</span></div>
+      <div class="inspector" id="inspector"></div>
+    </section>
+  </main>
+
+  <!-- Timeline -->
+  <section class="timeline-area" id="timelineArea">
+    <div class="timeline-toolbar">
+      <div class="row gap4">
+        <button class="tool-btn" data-cmd="split" title="Split at playhead (Ctrl+B or S)">✂ Split</button>
+        <button class="tool-btn" data-cmd="delete" title="Delete (Del)">🗑 Delete</button>
+        <button class="tool-btn" data-cmd="rippleDelete" title="Ripple delete: remove and close the gap (Shift+Del)">⇤ Ripple</button>
+        <button class="tool-btn" data-cmd="duplicate" title="Duplicate (Ctrl+D)">⧉ Duplicate</button>
+        <button class="tool-btn" data-cmd="detach" title="Separate audio from video (Ctrl+Shift+D)">♪ Detach audio</button>
+        <button class="tool-btn" data-cmd="extractAudio" title="Save a clip's audio as WAV/MP3/M4A">⇩ Extract audio</button>
+        <span class="sep"></span>
+        <button class="tool-btn toggle on" id="snapBtn" title="Snapping (N)">🧲 Snap</button>
+        <button class="tool-btn" data-cmd="addVideoTrack" title="Add video track">+ Video track</button>
+        <button class="tool-btn" data-cmd="addAudioTrack" title="Add audio track">+ Audio track</button>
+      </div>
+      <div class="row gap4">
+        <span class="muted small" id="durationLabel">0:00</span>
+        <button class="tool-btn" data-cmd="zoomOut" title="Zoom out (Ctrl+-)">−</button>
+        <input type="range" id="zoomSlider" min="0" max="100" value="40" title="Timeline zoom">
+        <button class="tool-btn" data-cmd="zoomIn" title="Zoom in (Ctrl+=)">+</button>
+        <button class="tool-btn" data-cmd="zoomFit" title="Fit whole timeline (Shift+Z)">Fit</button>
+      </div>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="track-headers" id="trackHeaders">
+        <div class="ruler-corner"></div>
+        <div id="trackHeaderList"></div>
+      </div>
+      <div class="tracks-scroll" id="tracksScroll">
+        <div class="tracks-inner" id="tracksInner">
+          <div class="ruler" id="ruler"></div>
+          <div id="trackLanes"></div>
+          <div class="playhead" id="playhead"><div class="playhead-head"></div></div>
+          <div class="snap-line hidden" id="snapLine"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Modal root -->
+<div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" id="modal"></div></div>
+<div class="toast-wrap" id="toasts"></div>
+<div id="mediaPool" class="hidden"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
