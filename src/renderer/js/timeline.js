@@ -1,7 +1,10 @@
 // Multi-track timeline UI.
-import { clearRange, snapPoints, maxDuration, newClip, formatTime, uid, EPS } from './state.js';
+import { clearRange, snapPoints, maxDuration, newClip, formatTime, uid, EPS, magneticDrop, pushClips } from './state.js';
 
 const SNAP_PX = 8;
+const DROP_SNAP_PX = 24; // drops snap from further away than moves
+// Zoom range: from about 3 hours across the screen down to individual frames.
+const MIN_PPS = 0.05, MAX_PPS = 600;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const h = (tag, cls, attrs = {}) => {
   const el = document.createElement(tag);
@@ -31,10 +34,24 @@ export class Timeline {
     this.scroll.addEventListener('wheel', (e) => {
       if (e.ctrlKey) {
         e.preventDefault();
-        this.zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX);
+        // Bigger wheel/trackpad movements zoom further in one go.
+        this.zoomAt(Math.exp(clamp(-e.deltaY, -400, 400) * 0.003), e.clientX);
+      } else if (e.target.closest('.ruler') || e.shiftKey) {
+        e.preventDefault();
+        this.scroll.scrollLeft += e.deltaY || e.deltaX;
       }
     }, { passive: false });
     this.snapBtn.addEventListener('click', () => this.toggleSnap());
+    // Track height (vertical zoom): slider, or Alt + mouse wheel over the timeline.
+    this.trackHeight.addEventListener('input', () => this.setTrackHeight(Number(this.trackHeight.value)));
+    this.scroll.parentElement.addEventListener('wheel', (e) => {
+      if (!e.altKey) return;
+      e.preventDefault();
+      this.setTrackHeight(this.trackH * (e.deltaY < 0 ? 1.12 : 1 / 1.12));
+    }, { passive: false });
+    let saved = 56;
+    try { saved = Number(localStorage.getItem('mc.trackHeight')) || 56; } catch (_) { /* storage unavailable */ }
+    this.setTrackHeight(saved);
     this.setupRuler();
     this.setupLaneEvents();
     this.render();
@@ -43,19 +60,19 @@ export class Timeline {
   // ---------- zoom ----------
   zoomFromSlider(v, keepPlayhead = false) {
     const old = this.pps;
-    this.pps = 4 * Math.pow(150, v / 100);
+    this.pps = MIN_PPS * Math.pow(MAX_PPS / MIN_PPS, v / 100);
     if (keepPlayhead) {
       const px = this.store.playhead * old - this.scroll.scrollLeft;
       this.render();
       this.scroll.scrollLeft = this.store.playhead * this.pps - px;
     } else this.render();
   }
-  sliderFromPps() { this.zoomSlider.value = String(clamp(Math.log(this.pps / 4) / Math.log(150) * 100, 0, 100)); }
+  sliderFromPps() { this.zoomSlider.value = String(clamp(Math.log(this.pps / MIN_PPS) / Math.log(MAX_PPS / MIN_PPS) * 100, 0, 100)); }
   zoomAt(factor, clientX) {
     const rect = this.scroll.getBoundingClientRect();
     const x = clientX - rect.left;
     const t = (this.scroll.scrollLeft + x) / this.pps;
-    this.pps = clamp(this.pps * factor, 4, 600);
+    this.pps = clamp(this.pps * factor, MIN_PPS, MAX_PPS);
     this.sliderFromPps();
     this.render();
     this.scroll.scrollLeft = t * this.pps - x;
@@ -64,12 +81,20 @@ export class Timeline {
   zoomOut() { this.zoomAt(1 / 1.4, this.playheadClientX()); }
   zoomFit() {
     const d = Math.max(5, this.store.duration());
-    this.pps = clamp((this.scroll.clientWidth - 40) / d, 4, 600);
+    const room = this.scroll.clientWidth - 24;
+    this.pps = clamp(room / (d + Math.min(30, 160 / Math.max(room / d, 1e-6))), MIN_PPS, MAX_PPS);
     this.sliderFromPps();
     this.render();
     this.scroll.scrollLeft = 0;
   }
   playheadClientX() { return this.scroll.getBoundingClientRect().left + this.store.playhead * this.pps - this.scroll.scrollLeft; }
+  setTrackHeight(px) {
+    this.trackH = clamp(Math.round(px), 28, 160);
+    document.documentElement.style.setProperty('--track-h', this.trackH + 'px');
+    this.trackHeight.value = String(this.trackH);
+    this.scroll.parentElement.classList.toggle('compact', this.trackH < 50);
+    try { localStorage.setItem('mc.trackHeight', String(this.trackH)); } catch (_) { /* storage unavailable */ }
+  }
   toggleSnap() { this.snapping = !this.snapping; this.snapBtn.classList.toggle('on', this.snapping); }
 
   // ---------- coordinates ----------
@@ -84,10 +109,10 @@ export class Timeline {
     }
     return null;
   }
-  snap(t, exclude, enable = this.snapping) {
+  snap(t, exclude, enable = this.snapping, px = SNAP_PX) {
     if (!enable) return { t, hit: null };
     const pts = snapPoints(this.store.project, this.store.playhead, exclude);
-    let best = null, bd = SNAP_PX / this.pps;
+    let best = null, bd = px / this.pps;
     for (const p of pts) { const d = Math.abs(p - t); if (d < bd) { bd = d; best = p; } }
     return best === null ? { t, hit: null } : { t: best, hit: best };
   }
@@ -102,7 +127,8 @@ export class Timeline {
     const s = this.store;
     const p = s.project;
     const dur = s.duration();
-    const width = Math.max(this.scroll.clientWidth, (dur + 30) * this.pps);
+    // A little room after the last clip to drop more onto: 30 s, but never more than 160 px.
+    const width = Math.max(this.scroll.clientWidth, dur * this.pps + Math.min(30 * this.pps, 160));
     this.inner.style.width = width + 'px';
     this.durationLabel.textContent = `Length ${formatTime(dur, p.settings.fps, false)}`;
     this.renderRuler(width);
@@ -127,8 +153,8 @@ export class Timeline {
     const r = this.ruler;
     r.innerHTML = '';
     const fps = this.store.project.settings.fps;
-    const steps = [1 / fps, 2 / fps, 5 / fps, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
-    const major = steps.find((st) => st * this.pps >= 90) || 600;
+    const steps = [1 / fps, 2 / fps, 5 / fps, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
+    const major = steps.find((st) => st * this.pps >= 90) || 7200;
     const minor = major / (major >= 1 ? 5 : 2);
     const startT = Math.floor(this.scroll.scrollLeft / this.pps / major) * major;
     const endT = (this.scroll.scrollLeft + this.scroll.clientWidth + 200) / this.pps;
@@ -136,7 +162,7 @@ export class Timeline {
     const frag = document.createDocumentFragment();
     const perMajor = Math.round(major / minor);
     const i0 = Math.max(0, Math.round((startT - major) / minor));
-    const i1 = Math.ceil(Math.min(endT, width / this.pps) / minor);
+    const i1 = Math.floor(Math.min(endT, width / this.pps) / minor);
     for (let i = i0; i <= i1; i++) {
       const t = Math.round(i * minor * fps) / fps;
       const isMajor = i % perMajor === 0;
@@ -232,9 +258,11 @@ export class Timeline {
   updatePlayhead() {
     const x = this.store.playhead * this.pps;
     this.playhead.style.left = x + 'px';
+    const left = this.scroll.scrollLeft, w = this.scroll.clientWidth;
     if (this.preview.playing) {
-      const left = this.scroll.scrollLeft, w = this.scroll.clientWidth;
       if (x > left + w - 40 || x < left) this.scroll.scrollLeft = x - 40;
+    } else if (!this.scrubbing && (x > left + w || x < left)) {
+      this.scroll.scrollLeft = x - w / 2; // jumped off-screen (e.g. End key): bring it into view
     }
   }
 
@@ -249,8 +277,9 @@ export class Timeline {
         this.store.setPlayhead(t);
         this.preview.resync();
       };
+      this.scrubbing = true;
       move(e);
-      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+      const up = () => { this.scrubbing = false; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
     };
@@ -282,22 +311,42 @@ export class Timeline {
       const lane = e.target.closest('.lane');
       for (const l of this.lanes.querySelectorAll('.drop-target')) if (l !== lane) l.classList.remove('drop-target');
       if (lane) lane.classList.add('drop-target');
-      this.showSnap(this.timeAt(e.clientX));
+      this.showSnap(this.dropTarget(e).t);
     });
     this.lanes.addEventListener('dragleave', (e) => { if (!this.lanes.contains(e.relatedTarget)) this.clearDrop(); });
     this.lanes.addEventListener('drop', async (e) => {
       e.preventDefault();
       const trackId = this.laneAt(e.clientY);
-      const t = this.snap(this.timeAt(e.clientX), new Set()).t;
+      const { t, magnetic } = this.dropTarget(e);
       this.clearDrop();
+      this.dragMediaId = null;
       const mediaId = e.dataTransfer.getData('application/x-meandercut-media');
-      if (mediaId) this.placeMedia(mediaId, t, trackId);
+      if (mediaId) this.placeMedia(mediaId, t, trackId, { magnetic });
       else if (e.dataTransfer.files.length) {
         const ids = await this.ui.onMediaDrop([...e.dataTransfer.files]);
         let at = t;
-        for (const id of ids) { const c = this.placeMedia(id, at, trackId); if (c) at = c.start + c.duration; }
+        for (const id of ids) { const c = this.placeMedia(id, at, trackId, { magnetic }); if (c) at = c.start + c.duration; }
       }
     });
+  }
+  /**
+   * Where a drop at the mouse position will land. With snapping on, the clip snaps onto the
+   * track (flush against neighbouring clips, see magneticDrop). Hold Alt, or turn Snap off,
+   * to drop exactly where the mouse is.
+   */
+  dropTarget(e) {
+    const raw = this.timeAt(e.clientX);
+    const magnetic = this.snapping && !e.altKey;
+    if (!magnetic) return { t: raw, magnetic };
+    const t = this.snap(raw, new Set(), true, DROP_SNAP_PX).t;
+    // Preview the landing spot when we know what is being dragged.
+    const m = this.dragMediaId && this.store.media(this.dragMediaId);
+    const tr = this.store.track(this.laneAt(e.clientY));
+    if (m && tr && tr.kind === (m.type === 'audio' ? 'audio' : 'video')) {
+      const dur = m.type === 'image' ? 5 : m.duration;
+      return { t: magneticDrop(this.store.project, tr.id, t, dur).start, magnetic };
+    }
+    return { t, magnetic };
   }
   clearDrop() {
     for (const l of this.lanes.querySelectorAll('.drop-target')) l.classList.remove('drop-target');
@@ -305,7 +354,7 @@ export class Timeline {
   }
 
   /** Put media on the timeline. Picks a compatible track if the target doesn't fit. */
-  placeMedia(mediaId, t, trackId) {
+  placeMedia(mediaId, t, trackId, { magnetic = false } = {}) {
     const s = this.store;
     const m = s.media(mediaId);
     if (!m || m.missing) return null;
@@ -328,7 +377,13 @@ export class Timeline {
         if (wantKind === 'video') p.tracks.unshift(track); else p.tracks.push(track);
       }
       clip = newClip(m, track.id, t);
-      clearRange(p, track.id, clip.start, clip.start + clip.duration);
+      if (magnetic) {
+        const { start, push } = magneticDrop(p, track.id, t, clip.duration);
+        pushClips(p, track.id, start, push);
+        clip.start = start;
+      } else {
+        clearRange(p, track.id, clip.start, clip.start + clip.duration);
+      }
       p.clips.push(clip);
     });
     if (clip) s.select([clip.id]);

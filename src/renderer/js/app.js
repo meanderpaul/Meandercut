@@ -27,7 +27,7 @@ const ui = { toast, importPaths, onMediaDrop: dropFiles, recorderStop: null };
 const timeline = new Timeline(store, preview, {
   scroll: $('tracksScroll'), inner: $('tracksInner'), ruler: $('ruler'), lanes: $('trackLanes'),
   headerList: $('trackHeaderList'), playhead: $('playhead'), snapLine: $('snapLine'),
-  zoomSlider: $('zoomSlider'), durationLabel: $('durationLabel'), snapBtn: $('snapBtn'),
+  zoomSlider: $('zoomSlider'), trackHeight: $('trackHeight'), durationLabel: $('durationLabel'), snapBtn: $('snapBtn'),
 }, ui);
 new Inspector(store, $('inspector'), $('inspectorTitle'), {
   detach: () => run('detach'), extractAudio: () => run('extractAudio'), delete: () => run('delete'), toast,
@@ -92,7 +92,9 @@ function renderMedia() {
     meta.firstChild.textContent = m.name;
     meta.lastChild.textContent = m.type === 'audio' ? (m.voice ? 'Voice-over' : 'Audio') : m.width ? `${m.width}×${m.height}${m.type === 'video' ? ` · ${Math.round(m.fps)}fps` : ''}` : m.type;
     card.appendChild(meta);
+    card.addEventListener('dragend', () => { timeline.dragMediaId = null; timeline.clearDrop(); });
     card.addEventListener('dragstart', (e) => {
+      timeline.dragMediaId = m.id;
       e.dataTransfer.setData('application/x-meandercut-media', m.id);
       e.dataTransfer.effectAllowed = 'copy';
     });

@@ -107,6 +107,11 @@
       </div>
       <div class="row gap4">
         <span class="muted small" id="durationLabel">0:00</span>
+        <span class="sep"></span>
+        <span class="muted small" title="Track height (Alt + mouse wheel over the timeline)">↕</span>
+        <input type="range" id="trackHeight" min="28" max="160" value="56" title="Track height: make tracks taller or shorter (Alt + mouse wheel)">
+        <span class="sep"></span>
+        <span class="muted small" title="Timeline zoom (Ctrl + mouse wheel)">↔</span>
         <button class="tool-btn" data-cmd="zoomOut" title="Zoom out (Ctrl+-)">−</button>
         <input type="range" id="zoomSlider" min="0" max="100" value="40" title="Timeline zoom">
         <button class="tool-btn" data-cmd="zoomIn" title="Zoom in (Ctrl+=)">+</button>

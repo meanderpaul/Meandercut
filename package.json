@@ -1,7 +1,7 @@
 {
   "name": "meandercut",
   "productName": "MeanderCut",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A focused desktop video editor: timeline editing, clips, audio separation, voice-over recording and 4K export. No stickers, no fluff.",
   "main": "src/main/main.js",
   "author": "Meanderpaul_gaming",

@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('mc', {
   onExportProgress: on('export:progress'),
   extractAudio: invoke('audio:extract'),
   saveRecording: invoke('record:save'),
+  getSettings: invoke('settings:get'),
+  setSettings: invoke('settings:set'),
   showItem: invoke('shell:showItem'),
   closeNow: invoke('app:closeNow'),
   info: invoke('app:info'),

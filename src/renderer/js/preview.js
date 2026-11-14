@@ -130,9 +130,27 @@ export class Preview {
   }
 
   // ---------- transport ----------
+  /**
+   * Where the last thing you can actually see or hear ends. Clips on hidden or muted tracks,
+   * muted clips and missing files don't count, so playback stops when nothing is left to play.
+   */
+  contentEnd() {
+    let end = 0;
+    for (const c of this.store.project.clips) {
+      const t = this.store.track(c.trackId);
+      const m = this.store.media(c.mediaId);
+      if (!t || !m || m.missing) continue;
+      const visible = t.kind === 'video' && !t.hidden && (m.type === 'video' || m.type === 'image') && c.opacity > 0;
+      const audible = m.hasAudio && this.audibleTrack(t) && !c.muted && c.volume > 0 && (t.volume ?? 1) > 0 &&
+        !(t.kind === 'video' && c.audioDetached);
+      if (visible || audible) end = Math.max(end, c.start + c.duration);
+    }
+    return end;
+  }
+
   async play() {
     if (this.playing) return;
-    const dur = this.store.duration();
+    const dur = this.contentEnd();
     if (dur <= 0) return;
     if (this.store.playhead >= dur - 0.01) this.store.setPlayhead(0);
     await this.audio.resume();
@@ -157,8 +175,11 @@ export class Preview {
     let t = this.store.playhead;
     if (this.playing) {
       t = this.startPos + (performance.now() - this.t0) / 1000;
-      const end = this.store.duration();
-      if (t >= end) { t = end; this.store.setPlayhead(t); this.pause(); }
+      const end = this.contentEnd();
+      if (t >= end) {
+        t = end; this.store.setPlayhead(t); this.pause();
+        if (this.onEnd) this.onEnd();
+      }
       else this.store.setPlayhead(t);
     }
     this.syncMedia(t);

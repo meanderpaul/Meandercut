@@ -371,6 +371,17 @@ function registerIpc() {
     return wav;
   });
 
+  // Small preferences file (default microphone, recorder options) in the user's app-data folder.
+  const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
+  const readSettings = async () => { try { return JSON.parse(await fsp.readFile(settingsFile(), 'utf8')); } catch (_) { return {}; } };
+  ipcMain.handle('settings:get', () => readSettings());
+  ipcMain.handle('settings:set', async (_e, patch) => {
+    const next = Object.assign(await readSettings(), patch);
+    await fsp.mkdir(app.getPath('userData'), { recursive: true });
+    await fsp.writeFile(settingsFile(), JSON.stringify(next, null, 2));
+    return next;
+  });
+
   ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); return true; });
   ipcMain.handle('app:closeNow', () => { allowClose = true; if (win) win.close(); return true; });
   ipcMain.handle('app:info', () => ({ version: app.getVersion(), ffmpeg: FFMPEG, ffprobe: FFPROBE, recordings: recordingsDir() }));

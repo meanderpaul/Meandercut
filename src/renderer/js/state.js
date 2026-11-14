@@ -260,3 +260,38 @@ export function sourceTime(clip, t) {
   const local = Math.min(Math.max(0, t - clip.start), clip.duration);
   return clip.reversed ? clip.in + (clip.duration - local) * clip.speed : clip.in + local * clip.speed;
 }
+
+/**
+ * Magnetic drop: where a new clip of length `dur` dropped at time `t` should land on a track,
+ * so it sits flush against its neighbours instead of leaving a gap or covering another clip.
+ *  - dropped on a clip: goes before or after it, whichever edge is nearer
+ *  - dropped in a gap: butts up against the previous clip's end, or the next clip's start if that is closer
+ *  - empty track: stays at `t`
+ * Returns { start, push }: later clips on the track move right by `push` seconds to make room.
+ */
+export function magneticDrop(project, trackId, t, dur) {
+  const clips = project.clips.filter((c) => c.trackId === trackId).sort((a, b) => a.start - b.start);
+  if (!clips.length) return { start: Math.max(0, t), push: 0 };
+  let start;
+  const hit = clips.find((c) => t >= c.start && t < c.start + c.duration);
+  if (hit) {
+    start = t - hit.start < hit.duration / 2 ? hit.start : hit.start + hit.duration;
+  } else {
+    const prev = [...clips].reverse().find((c) => c.start + c.duration <= t + EPS);
+    const next = clips.find((c) => c.start > t);
+    const left = prev ? prev.start + prev.duration : 0;
+    start = left;
+    if (next) {
+      const right = Math.max(left, next.start - dur);
+      if (Math.abs(right - t) < Math.abs(left - t)) start = right;
+    }
+  }
+  const blocker = clips.find((c) => c.start >= start - EPS && c.start < start + dur - EPS);
+  return { start, push: blocker ? start + dur - blocker.start : 0 };
+}
+
+/** Apply a magnetic drop's push: move every clip on the track that starts at or after `from` right by `push`. */
+export function pushClips(project, trackId, from, push) {
+  if (push <= EPS) return;
+  for (const c of project.clips) if (c.trackId === trackId && c.start >= from - EPS) c.start += push;
+}

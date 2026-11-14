@@ -228,15 +228,31 @@ export async function recordDialog(store, preview, ui) {
   let stream = null, recorder = null, chunks = [], meterCtx = null, raf = 0, timer = 0, startAt = 0, startPlayhead = 0;
   const state = { recording: false, countdown: false };
 
-  const deviceSel = select([['', 'Default microphone']]);
-  field(body, 'Microphone', deviceSel);
-  const opt = (label, on) => { const l = el('label', 'check'); const c = el('input'); c.type = 'checkbox'; c.checked = on; l.append(c, document.createTextNode(label)); body.appendChild(l); return c; };
-  const playAlong = opt('Play the timeline while recording (narrate over your video)', true);
-  const muteMonitor = opt('Mute timeline sound while recording (avoids echo without headphones)', true);
-  const countdown = opt('3-second countdown', true);
-  const noise = opt('Noise suppression', true);
-  const echo = opt('Echo cancellation', false);
-  const agc = opt('Auto gain', false);
+  // Saved recorder preferences: default microphone and the checkboxes below.
+  const settings = await window.mc.getSettings().catch(() => ({}));
+  const prefs = Object.assign({ micId: '', micLabel: '' }, settings.recorder || {});
+  const savePrefs = (patch) => { Object.assign(prefs, patch); window.mc.setSettings({ recorder: prefs }).catch(() => {}); };
+
+  const deviceSel = select([['', 'System default microphone']]);
+  const micWrap = el('div', 'row gap4');
+  const makeDefault = btn('Set as default', 'btn small');
+  makeDefault.title = 'Use this microphone every time you record';
+  deviceSel.style.flex = '1';
+  micWrap.append(deviceSel, makeDefault);
+  field(body, 'Microphone', micWrap);
+  const opt = (key, label, on) => {
+    const l = el('label', 'check'); const c = el('input'); c.type = 'checkbox';
+    c.checked = prefs[key] ?? on;
+    c.addEventListener('change', () => savePrefs({ [key]: c.checked }));
+    l.append(c, document.createTextNode(label)); body.appendChild(l); return c;
+  };
+  const playAlong = opt('playAlong', 'Play the timeline while recording (narrate over your video)', true);
+  const autoStop = opt('autoStop', 'Stop recording when the timeline reaches the end', true);
+  const muteMonitor = opt('muteMonitor', 'Mute timeline sound while recording (avoids echo without headphones)', true);
+  const countdown = opt('countdown', '3-second countdown', true);
+  const noise = opt('noise', 'Noise suppression', true);
+  const echo = opt('echo', 'Echo cancellation', false);
+  const agc = opt('agc', 'Auto gain', false);
 
   const panel = el('div', 'rec-panel');
   const level = el('div', 'level'); const levelFill = el('div'); level.appendChild(levelFill);
@@ -249,19 +265,31 @@ export async function recordDialog(store, preview, ui) {
   close.onclick = () => closeModal();
   foot.appendChild(close);
 
-  async function openStream() {
+  const constraints = (id) => ({
+    audio: {
+      deviceId: id ? { exact: id } : undefined,
+      noiseSuppression: noise.checked, echoCancellation: echo.checked, autoGainControl: agc.checked,
+      channelCount: 1, sampleRate: 48000,
+    },
+  });
+  async function openStream(wantId = deviceSel.value) {
     if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = null;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: deviceSel.value ? { exact: deviceSel.value } : undefined,
-          noiseSuppression: noise.checked, echoCancellation: echo.checked, autoGainControl: agc.checked,
-          channelCount: 1, sampleRate: 48000,
-        },
-      });
+      stream = await navigator.mediaDevices.getUserMedia(constraints(wantId));
     } catch (e) {
-      hint.textContent = 'Could not open the microphone: ' + e.message + '. Check Windows Settings → Privacy → Microphone.';
-      return;
+      if (wantId) {
+        // The chosen mic is unplugged or renamed: fall back to the system default.
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints(''));
+          wantId = '';
+          hint.textContent = 'Your default microphone was not found, so the system default is being used.';
+        } catch (_) { /* reported below */ }
+      }
+      if (!stream) {
+        hint.textContent = 'Could not open the microphone: ' + e.message + '. Check Windows Settings → Privacy → Microphone.';
+        return;
+      }
     }
     if (meterCtx) meterCtx.close();
     meterCtx = new AudioContext();
@@ -278,17 +306,42 @@ export async function recordDialog(store, preview, ui) {
       raf = requestAnimationFrame(loop);
     };
     loop();
-    // Device labels are only available after permission is granted.
-    const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
-    const cur = deviceSel.value;
-    deviceSel.innerHTML = '';
-    for (const d of devices) deviceSel.appendChild(new Option(d.label || 'Microphone', d.deviceId === 'default' ? '' : d.deviceId));
-    if ([...deviceSel.options].some((o) => o.value === cur)) deviceSel.value = cur;
+    await fillDevices(wantId);
   }
+  // Device names are only available after microphone permission is granted.
+  async function fillDevices(selectId) {
+    const devices = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    deviceSel.innerHTML = '';
+    deviceSel.appendChild(new Option(`System default microphone${prefs.micId ? '' : '  ★ default'}`, ''));
+    for (const d of devices) {
+      const label = d.label || 'Microphone';
+      deviceSel.appendChild(new Option(label + (d.deviceId === prefs.micId ? '  ★ default' : ''), d.deviceId));
+    }
+    if ([...deviceSel.options].some((o) => o.value === selectId)) deviceSel.value = selectId;
+    makeDefault.disabled = deviceSel.value === prefs.micId;
+    return devices;
+  }
+  /** The saved default mic's current id. Matches by name too, in case Windows gave it a new id. */
+  async function savedMicId() {
+    if (!prefs.micId) return '';
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+    if (devices.some((d) => d.deviceId === prefs.micId)) return prefs.micId;
+    const byName = prefs.micLabel && devices.find((d) => d.label === prefs.micLabel);
+    if (byName) { savePrefs({ micId: byName.deviceId }); return byName.deviceId; }
+    return prefs.micId; // ids may be hidden until permission is granted; try it anyway
+  }
+  makeDefault.onclick = async () => {
+    const o = deviceSel.selectedOptions[0];
+    savePrefs({ micId: deviceSel.value, micLabel: deviceSel.value ? o.textContent.replace(/\s+★ default$/, '') : '' });
+    await fillDevices(deviceSel.value);
+    ui.toast(deviceSel.value ? 'Default microphone saved.' : 'Using the system default microphone.');
+  };
+  deviceSel.addEventListener('change', () => { makeDefault.disabled = deviceSel.value === prefs.micId; });
   const fmtRec = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${(s % 60).toFixed(1).padStart(4, '0')}`;
 
   for (const c of [deviceSel, noise, echo, agc]) c.addEventListener('change', () => { if (!state.recording) openStream(); });
-  await openStream();
+  await openStream(await savedMicId());
 
   big.onclick = async () => {
     if (state.countdown) return;
@@ -312,9 +365,10 @@ export async function recordDialog(store, preview, ui) {
     closable = false;
     big.classList.add('recording'); big.title = 'Stop recording';
     hint.textContent = 'Recording… click the square (or press Space) to stop.';
-    if (playAlong.checked && startPlayhead < store.duration() - 0.05) {
+    if (playAlong.checked && startPlayhead < preview.contentEnd() - 0.05) {
       store.setPlayhead(startPlayhead);
       preview.monitorMuted = muteMonitor.checked;
+      preview.onEnd = () => { if (state.recording && autoStop.checked) stop(); };
       preview.play();
     }
     clearInterval(timer);
@@ -324,6 +378,7 @@ export async function recordDialog(store, preview, ui) {
     recorder.stop();
     state.recording = false;
     big.classList.remove('recording'); big.title = 'Start recording';
+    preview.onEnd = null;
     preview.pause();
     preview.monitorMuted = false;
     hint.textContent = 'Saving…';
@@ -360,6 +415,7 @@ export async function recordDialog(store, preview, ui) {
   }
   function cleanup() {
     if (state.recording) stop();
+    preview.onEnd = null;
     cancelAnimationFrame(raf);
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (meterCtx) meterCtx.close();
@@ -376,7 +432,9 @@ export function shortcutsDialog() {
     ['Ripple delete (close gap)', 'Shift+Delete'], ['Duplicate', 'Ctrl+D'], ['Detach audio', 'Ctrl+Shift+D'],
     ['Select all clips', 'Ctrl+A'], ['Undo / redo', 'Ctrl+Z / Ctrl+Y'], ['Import media', 'Ctrl+I'],
     ['Record voice-over', 'Ctrl+R'], ['Export', 'Ctrl+E'], ['Save / Save as', 'Ctrl+S / Ctrl+Shift+S'],
-    ['Toggle snapping', 'N'], ['Zoom timeline', 'Ctrl + mouse wheel, Ctrl+= / Ctrl+-'], ['Fit timeline', 'Shift+Z'],
+    ['Toggle snapping', 'N'], ['Zoom timeline in / out', 'Ctrl + mouse wheel, Ctrl+= / Ctrl+-'], ['Fit whole timeline', 'Shift+Z'],
+    ['Taller / shorter tracks', 'Alt + mouse wheel'], ['Scroll timeline sideways', 'Shift + mouse wheel, or wheel over the ruler'],
+    ['Drop exactly at the mouse (no snapping)', 'hold Alt while dropping'],
     ['Snap playhead while scrubbing', 'hold Shift'], ['Free move in preview (no centre snap)', 'hold Alt'],
   ];
   const g = el('div', 'shortcuts');

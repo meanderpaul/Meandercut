@@ -100,3 +100,24 @@ assert.deepEqual(sizeFor('9:16', 1080), { width: 1080, height: 1920 });
 assert.deepEqual(sizeFor('1:1', 1080), { width: 1080, height: 1080 });
 
 console.log('ok  editing operations (split, overwrite, reverse, ripple, detach, speed, undo, aspect)');
+
+// Magnetic drop
+{
+  const { magneticDrop, pushClips } = await import('../src/renderer/js/state.js');
+  const s = fresh();
+  const v = s.project.tracks[0].id;
+  s.project.clips.push(newClip(media, v, 0, { id: 'a', duration: 10 }), newClip(media, v, 20, { id: 'b', duration: 5 }));
+  near(magneticDrop(s.project, v, 12, 3).start, 10, 'gap: flush after previous clip');
+  near(magneticDrop(s.project, v, 18, 3).start, 17, 'gap: flush before next clip when closer');
+  let r = magneticDrop(s.project, v, 3, 4);
+  near(r.start, 0, 'on clip, left half: before it'); near(r.push, 4, 'pushes the clip right');
+  r = magneticDrop(s.project, v, 8, 4);
+  near(r.start, 10, 'on clip, right half: after it'); near(r.push, 0, 'fits the gap');
+  r = magneticDrop(s.project, v, 12, 15);
+  near(r.start, 10, 'long clip starts flush'); near(r.push, 5, 'pushes next clip just enough');
+  pushClips(s.project, v, r.start, r.push);
+  near(s.clip('b').start, 25, 'next clip moved'); near(s.clip('a').start, 0, 'earlier clip untouched');
+  near(magneticDrop(s.project, v, 100, 3).start, 30, 'after the last clip: flush to its end');
+  near(magneticDrop(s.project, s.project.tracks[1].id, 7, 3).start, 7, 'empty track: stays put');
+  console.log('ok  magnetic drop');
+}
