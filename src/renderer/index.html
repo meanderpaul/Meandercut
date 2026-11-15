@@ -39,12 +39,23 @@
         <button class="tab" data-filter="video">Video</button>
         <button class="tab" data-filter="audio">Audio</button>
         <button class="tab" data-filter="image">Images</button>
+        <button class="tab" data-filter="sounds" title="Sound library: bundled sound packs and your own">Sounds</button>
       </div>
       <div class="media-list" id="mediaList">
         <div class="empty-hint" id="mediaEmpty">
           <div class="big">Drop files here</div>
           <div>Video, audio, voice recordings and images.<br>Or click <b>+ Import</b>.</div>
         </div>
+      </div>
+      <div class="sound-lib hidden" id="soundLib">
+        <div class="sound-tools">
+          <input type="text" id="soundSearch" placeholder="Search sounds" aria-label="Search sounds">
+          <button class="btn small" id="soundAddFiles" title="Copy audio files into your library (My Sounds)">+ Files</button>
+          <button class="btn small" id="soundAddFolder" title="Copy a whole folder of sounds in as a new pack">+ Folder</button>
+          <button class="btn small ghost" id="soundOpenFolder" title="Open your sound library folder. Every folder in it shows up here as a pack.">📂</button>
+          <button class="btn small ghost" id="soundRefresh" title="Reload the sound library">⟳</button>
+        </div>
+        <div class="sound-packs" id="soundPacks"><div class="empty-hint">Loading sounds…</div></div>
       </div>
     </section>
 
