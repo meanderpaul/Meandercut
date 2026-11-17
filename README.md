@@ -28,6 +28,13 @@ Built by **Meanderpaul_gaming**.
 - Per-track volume, mute and solo, with a stereo output meter
 - **Voice-over recorder**: pick a microphone, use a 3-2-1 countdown, and record while the timeline plays so you can narrate over your footage. Noise suppression is optional. Takes save as 48 kHz WAV files in `Documents\MeanderCut\Recordings` and land on the Voice-over track.
 
+**Sound library**
+- A **Sounds** tab in the media panel with sound packs ready to use: preview with ▶, double-click or press **+** to drop a sound at the playhead, or drag it onto any audio track
+- Ships with the **Cryptid Compendium: Mothman** pack: 19 sounds (ambience beds, sound effects and a theme), all made from scratch and free to use
+- Add your own: **+ Files** copies sounds into *My Sounds*, **+ Folder** brings in a whole folder as a new pack, and every folder in `Documents\MeanderCut\Sounds` shows up as a pack
+- Search across every pack. Sounds only join your project when you use them.
+- See [`sounds/README.md`](sounds/README.md) to add packs that ship with the app
+
 **View and picture**
 - Canvas aspect ratios: 16:9 (YouTube), 9:16 (Shorts/TikTok), 1:1, 4:5, 4:3 and 21:9, plus custom sizes
 - Project resolution from 720p to 4K, with frame rates from 23.976 to 120 fps

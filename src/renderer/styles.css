@@ -57,8 +57,8 @@ button, select, input { font: inherit; color: inherit; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); font-weight: 600; }
 
 /* Media bin */
-.media-tabs { display: flex; gap: 2px; padding: 6px 8px; }
-.tab { background: none; border: 0; padding: 4px 10px; border-radius: 12px; color: var(--muted); cursor: pointer; }
+.media-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 8px; }
+.tab { background: none; border: 0; padding: 4px 8px; border-radius: 12px; color: var(--muted); cursor: pointer; }
 .tab.active { background: var(--panel-3); color: var(--text); }
 .media-list { flex: 1; overflow-y: auto; padding: 6px 8px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; align-content: start; position: relative; }
 .media-list.drop { outline: 2px dashed var(--accent); outline-offset: -6px; }
@@ -76,6 +76,29 @@ button, select, input { font: inherit; color: inherit; }
 .media-item:hover .add { opacity: 1; }
 .media-item.missing { border-color: var(--danger); }
 .media-item.missing .thumb::after { content: "Missing - click to relink"; font-size: 11px; color: var(--danger); position: absolute; }
+
+/* Sound library (Media › Sounds) */
+.sound-lib { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.sound-tools { display: flex; gap: 4px; padding: 2px 8px 6px; align-items: center; }
+.sound-tools input { flex: 1; min-width: 0; }
+.sound-tools .btn.small { padding: 3px 6px; }
+.sound-packs { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+.sound-pack { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); margin-bottom: 8px; overflow: hidden; }
+.pack-head { width: 100%; display: flex; align-items: center; gap: 6px; padding: 7px 8px; background: none; border: 0; cursor: pointer; text-align: left; }
+.pack-head:hover { background: var(--panel-3); }
+.pack-head .caret { color: var(--muted); width: 10px; }
+.pack-name { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pack-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #23403a; color: #9fe9d6; }
+.pack-tag.user { background: #3c2f1d; color: #f2c88a; }
+.pack-desc { font-size: 11px; color: var(--muted); padding: 0 10px 6px; line-height: 1.4; }
+.sound-row { display: flex; align-items: center; gap: 6px; padding: 3px 6px 3px 8px; border-top: 1px solid var(--line); cursor: grab; min-height: 30px; }
+.sound-row:hover { background: #222731; }
+.sound-play { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: var(--panel-3); cursor: pointer; font-size: 10px; padding: 0; }
+.sound-play:hover, .sound-play.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.sound-name { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sound-dur { font-size: 11px; color: var(--muted); font-family: Consolas, monospace; }
+.sound-add { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 700; cursor: pointer; opacity: 0; }
+.sound-row:hover .sound-add, .sound-add:focus-visible { opacity: 1; }
 
 /* Preview */
 .preview-panel { background: #0b0c0f; }

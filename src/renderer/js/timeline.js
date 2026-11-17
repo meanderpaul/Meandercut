@@ -19,7 +19,7 @@ export class Timeline {
   constructor(store, preview, els, ui) {
     this.store = store;
     this.preview = preview;
-    this.ui = ui; // { toast, onMediaDrop }
+    this.ui = ui; // { toast, onMediaDrop, importPaths }
     Object.assign(this, els); // scroll, inner, ruler, lanes, headerList, playhead, snapLine, zoomSlider, durationLabel, snapBtn
     this.pps = 60; // pixels per second
     this.snapping = true;
@@ -306,7 +306,8 @@ export class Timeline {
 
     // Drag & drop from the media bin
     this.lanes.addEventListener('dragover', (e) => {
-      if (!e.dataTransfer.types.includes('application/x-meandercut-media') && !e.dataTransfer.types.includes('Files')) return;
+      const types = e.dataTransfer.types;
+      if (!types.includes('application/x-meandercut-media') && !types.includes('application/x-meandercut-sound') && !types.includes('Files')) return;
       e.preventDefault();
       const lane = e.target.closest('.lane');
       for (const l of this.lanes.querySelectorAll('.drop-target')) if (l !== lane) l.classList.remove('drop-target');
@@ -321,7 +322,13 @@ export class Timeline {
       this.clearDrop();
       this.dragMediaId = null;
       const mediaId = e.dataTransfer.getData('application/x-meandercut-media');
+      const soundPath = e.dataTransfer.getData('application/x-meandercut-sound');
       if (mediaId) this.placeMedia(mediaId, t, trackId, { magnetic });
+      else if (soundPath) {
+        // From the sound library: bring it into the media bin first, then place it.
+        const [id] = await this.ui.importPaths([soundPath]);
+        if (id) this.placeMedia(id, t, trackId, { magnetic });
+      }
       else if (e.dataTransfer.files.length) {
         const ids = await this.ui.onMediaDrop([...e.dataTransfer.files]);
         let at = t;

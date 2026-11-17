@@ -1,7 +1,7 @@
 {
   "name": "meandercut",
   "productName": "MeanderCut",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A focused desktop video editor: timeline editing, clips, audio separation, voice-over recording and 4K export. No stickers, no fluff.",
   "main": "src/main/main.js",
   "author": "Meanderpaul_gaming",
@@ -11,7 +11,7 @@
   "keywords": ["video editor", "electron", "ffmpeg", "4k", "voice-over", "capcut alternative"],
   "scripts": {
     "start": "electron .",
-    "test": "node test/state.test.mjs && node test/export.test.js",
+    "test": "node test/state.test.mjs && node test/sounds.test.js && node test/export.test.js",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable"
   },
@@ -28,6 +28,7 @@
     "productName": "MeanderCut",
     "copyright": "Copyright © 2026 Meanderpaul_gaming",
     "files": ["src/**/*", "build/icon.png", "package.json"],
+    "extraResources": [{ "from": "sounds", "to": "sounds", "filter": ["**/*"] }],
     "asarUnpack": ["node_modules/ffmpeg-static/**", "node_modules/ffprobe-static/**"],
     "fileAssociations": [{ "ext": "mcut", "name": "MeanderCut Project", "role": "Editor" }],
     "win": {

@@ -7,6 +7,7 @@ const { Readable } = require('stream');
 const { spawn, execFile } = require('child_process');
 const crypto = require('crypto');
 const { buildExport, FORMATS } = require('./exporter');
+const sounds = require('./sounds');
 
 // ---------- FFmpeg location ----------
 function resolveBinary(modName, field, fallback) {
@@ -94,6 +95,9 @@ function run(bin, args, opts = {}) {
 }
 const cacheDir = () => path.join(app.getPath('userData'), 'cache');
 const recordingsDir = () => path.join(app.getPath('documents'), 'MeanderCut', 'Recordings');
+// Sound packs bundled with the app (repo /sounds, copied next to the app when installed) and the user's own.
+const builtInSoundsDir = () => (app.isPackaged ? path.join(process.resourcesPath, 'sounds') : path.join(__dirname, '..', '..', 'sounds'));
+const userSoundsDir = () => path.join(app.getPath('documents'), 'MeanderCut', 'Sounds');
 const hashOf = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 16);
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff']);
 
@@ -174,6 +178,26 @@ async function detectEncoders() {
   } catch (e) {
     return [];
   }
+}
+
+// ---------- sound library ----------
+const durationCache = new Map();
+async function soundDuration(p) {
+  const key = p + '|' + fs.statSync(p).mtimeMs;
+  if (!durationCache.has(key)) {
+    const { stdout } = await run(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', p]);
+    durationCache.set(key, Number(stdout.trim()) || null);
+  }
+  return durationCache.get(key);
+}
+async function listSoundLibrary() {
+  await fsp.mkdir(userSoundsDir(), { recursive: true }).catch(() => {});
+  const packs = await sounds.listSounds([
+    { dir: builtInSoundsDir(), source: 'builtin' },
+    { dir: userSoundsDir(), source: 'user' },
+  ], soundDuration);
+  for (const pk of packs) for (const s of pk.sounds) allowedMedia.add(path.resolve(s.path)); // lets the bin preview them
+  return { packs, userDir: userSoundsDir() };
 }
 
 // ---------- export ----------
@@ -382,9 +406,29 @@ function registerIpc() {
     return next;
   });
 
+  ipcMain.handle('sounds:list', () => listSoundLibrary());
+  ipcMain.handle('sounds:openFolder', async () => {
+    await fsp.mkdir(userSoundsDir(), { recursive: true });
+    return shell.openPath(userSoundsDir());
+  });
+  ipcMain.handle('sounds:addFiles', async () => {
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Add sounds to your library', properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Audio', extensions: [...sounds.AUDIO_EXT].map((e) => e.slice(1)) }],
+    });
+    if (r.canceled) return [];
+    return sounds.copyFilesInto(r.filePaths, path.join(userSoundsDir(), 'My Sounds'));
+  });
+  ipcMain.handle('sounds:addFolder', async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Add a folder of sounds as a pack', properties: ['openDirectory'] });
+    if (r.canceled) return null;
+    await fsp.mkdir(userSoundsDir(), { recursive: true });
+    return sounds.copyFolderInto(r.filePaths[0], userSoundsDir());
+  });
+
   ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); return true; });
   ipcMain.handle('app:closeNow', () => { allowClose = true; if (win) win.close(); return true; });
-  ipcMain.handle('app:info', () => ({ version: app.getVersion(), ffmpeg: FFMPEG, ffprobe: FFPROBE, recordings: recordingsDir() }));
+  ipcMain.handle('app:info', () => ({ version: app.getVersion(), ffmpeg: FFMPEG, ffprobe: FFPROBE, recordings: recordingsDir(), sounds: userSoundsDir() }));
 }
 
 app.whenReady().then(() => {

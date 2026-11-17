@@ -4,6 +4,7 @@ import { Preview } from './preview.js';
 import { Timeline } from './timeline.js';
 import { Inspector } from './inspector.js';
 import { exportDialog, recordDialog, shortcutsDialog, modalOpen, closeModal } from './dialogs.js';
+import { SoundLibrary } from './sounds.js';
 
 const $ = (id) => document.getElementById(id);
 const store = new Store();
@@ -53,12 +54,19 @@ function syncViewControls() {
 
 // ---------- media bin ----------
 let mediaFilter = 'all';
+const sounds = new SoundLibrary({
+  root: $('soundLib'), packs: $('soundPacks'), search: $('soundSearch'), addFiles: $('soundAddFiles'),
+  addFolder: $('soundAddFolder'), openFolder: $('soundOpenFolder'), refresh: $('soundRefresh'),
+}, { toast, importPaths, placeAtPlayhead: (id) => timeline.placeMedia(id, store.playhead) });
 $('mediaTabs').addEventListener('click', (e) => {
   const b = e.target.closest('.tab');
   if (!b) return;
   mediaFilter = b.dataset.filter;
   for (const x of $('mediaTabs').children) x.classList.toggle('active', x === b);
-  renderMedia();
+  // The Sounds tab swaps the media bin for the sound library.
+  $('mediaList').classList.toggle('hidden', mediaFilter === 'sounds');
+  sounds.show(mediaFilter === 'sounds');
+  if (mediaFilter !== 'sounds') renderMedia();
 });
 
 function renderMedia() {

@@ -1,0 +1,36 @@
+CRYPTID COMPENDIUM: MOTHMAN EPISODE SOUND CUE SHEET
+All sounds were synthesized from scratch (no samples), so they are yours to use with no licensing issues.
+
+SCRIPT CUE                                         FILE
+--------------------------------------------------------------------------------------------
+Cold open: night ambience, car on gravel           02_night_ambience_crickets + 07_car_driving_gravel
+Cold open: engine slows, tires crunch              08_car_slows_idle
+Cold open: crickets cut out abruptly               03_crickets_cut_off
+Cold open: engine roars, tires spin                09_engine_roar_speed
+Cold open: single low note swells, then cuts       10_low_sting_cut
+Intro and outro: theme                             01_theme_music
+Seg 1: slow river current, distant barge horn      05_river_ambience + 06_distant_barge_horn
+Seg 2: TV static, rising electrical whine          11_tv_static_generator_whine
+Seg 2: wind (after Bandit runs off)                04_wind_bare_trees
+Seg 3: low, tense score under                      12_tense_score_bed
+Seg 3: engine revs hard                            09_engine_roar_speed
+Seg 3: engine slows to idle, crickets return       08_car_slows_idle + 02_night_ambience_crickets
+Seg 4: car doors, footsteps on gravel, wind        14_footsteps_stop_rustle + 04_wind_bare_trees
+Seg 4: footsteps stop, something heavy shifts      14_footsteps_stop_rustle (second half)
+Seg 4: door slams, bolt slides                     15_door_slam_bolt
+Seg 4: shuffling footsteps on the porch            16_heavy_footsteps_porch
+Seg 5: soft eerie ambient bed                      13_eerie_ambient_bed
+Seg 6: rush-hour traffic                           19_rush_hour_traffic
+Seg 6: groan, snap, collapse, splash               17_bridge_collapse
+Optional anywhere: creature screech                18_creature_screech
+
+NOT INCLUDED (synthesis can't make these sound real)
+- Dog barking/howling and the distant fading bark (Segment 2)
+- Screen door creak (Segment 2)
+- Car doors opening/closing (Segment 4)
+Free sources: Pixabay Sound Effects, Freesound.org (check each clip's license), BBC Sound Effects (personal/educational use only).
+
+MIXING TIPS
+- Keep ambience beds (02, 04, 05, 12, 13) about 18-24 dB under your voice.
+- The 60-second beds loop cleanly enough to repeat; crossfade over 2 seconds at each loop point.
+- Let the 17_bridge_collapse silence after the splash sit with the [PAUSE] cue before you speak.
